@@ -1,0 +1,15 @@
+include README.md
+include LICENSE
+include MANIFEST.in
+recursive-include src/biperscan *.pyx *.pxd
+recursive-include src/biperscan/cpp *.h *.cpp
+exclude src/biperscan/_impl.cpp
+exclude src/biperscan/cpp/.clang-format 
+exclude src/biperscan/cpp/graded_matrix.xlsx
+recursive-exclude src/biperscan/cpp *.txt
+recursive-exclude src/biperscan/cpp/tests *
+recursive-exclude src/biperscan/cpp/trial_scripts *
+recursive-exclude src/biperscan/cpp/cmake-build-* *
+recursive-exclude notebooks *
+recursive-exclude .github *
+recursive-exclude docs *

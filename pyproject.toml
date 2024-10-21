@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools", "numpy < 3", "Cython < 4"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biperscan"
+version = "0.1.0"
+description = "Bi-Persistence Clustering for Applications with Noise."
+keywords = ["clustering", "machine learning", "topological data analysis"]
+authors = [
+  {name= "Jelmer Bot", email = "jelmer.bot@uhasselt.be" }
+]
+readme = "README.md"
+license = { text = "BSD-3-Clause" } 
+classifiers = [
+	"Development Status :: 4 - Beta",
+	"License :: OSI Approved :: BSD License",
+	"Intended Audience :: Science/Research",
+	"Topic :: Scientific/Engineering",
+	"Topic :: Scientific/Engineering :: Visualization",
+	"Natural Language :: English",
+	"Operating System :: OS Independent",
+	"Programming Language :: Python :: 3 :: Only",
+	"Programming Language :: C++ :: 23",
+	"Programming Language :: Cython"
+]
+requires-python = ">=3.10"
+dependencies = [
+  "numpy < 3",
+	"scipy >= 1.9",
+	"joblib >= 1.1",
+	"hdbscan >=0.8,<1",
+	"scikit-learn >=1.1,<2",
+	"networkx >= 3.4"
+]
+
+[project.urls]
+Homepage = "https://github.com/vda-lab/biperscan"
+Issues = "https://github.com/vda-lab/biperscan/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["biperscan*"]
+exclude = ["biperscan.cpp*"]
+namespaces = false
+
+[project.optional-dependencies]
+tests = [
+	"pytest",
+	"matplotlib >= 3.8",
+	"networkx >= 3",
+  "pygraphviz >= 1",
+  "pandas >= 2.2",
+]
+docs = [
+	"sphinx >= 8",
+	"nbsphinx >= 0.9",
+	"sphinx_rtd_theme >= 2.0",
+	"matplotlib >= 3.8"
+]
+notebooks = [
+	"pandas >= 2.2",
+  "jupyterlab >= 4",
+  "matplotlib >= 3.4",
+	"pyflasc >= 0.1",
+  "pygraphviz >= 1",
+  "networkx >= 3",
+  "umap-learn >= 0.5"
+]
