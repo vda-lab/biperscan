@@ -26,12 +26,12 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-  "numpy < 3",
-	"scipy >= 1.9",
-	"joblib >= 1.1",
-	"hdbscan >=0.8,<1",
-	"scikit-learn >=1.1,<2",
-	"networkx >= 3.4"
+  "numpy >=2,<3",
+  "scipy >= 1.9",
+  "joblib >= 1.1",
+  "hdbscan >=0.8,<1",
+  "scikit-learn >=1.6,<2",
+  "networkx >= 3.4"
 ]
 
 [project.urls]
@@ -46,23 +46,23 @@ namespaces = false
 
 [project.optional-dependencies]
 tests = [
-	"pytest",
-	"matplotlib >= 3.8",
-	"networkx >= 3",
+  "pytest",
+  "matplotlib >= 3.8",
+  "networkx >= 3",
   "pygraphviz >= 1",
   "pandas >= 2.2",
 ]
 docs = [
-	"sphinx >= 8",
-	"nbsphinx >= 0.9",
-	"sphinx_rtd_theme >= 2.0",
-	"matplotlib >= 3.8"
+  "sphinx >= 8",
+  "nbsphinx >= 0.9",
+  "sphinx_rtd_theme >= 2.0",
+  "matplotlib >= 3.8"
 ]
 notebooks = [
-	"pandas >= 2.2",
+  "pandas >= 2.2",
   "jupyterlab >= 4",
   "matplotlib >= 3.4",
-	"pyflasc >= 0.1",
+  "pyflasc >= 0.1",
   "pygraphviz >= 1",
   "networkx >= 3",
   "umap-learn >= 0.5"

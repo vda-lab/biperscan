@@ -373,7 +373,7 @@ def bpscan(
     labels : array of shape (n_samples,)
         The computed cluster labels.
     """
-    X = check_array(X, force_all_finite=True, ensure_2d=metric != "precomputed")
+    X = check_array(X, ensure_all_finite=True, ensure_2d=metric != "precomputed")
 
     # Fill in default parameters
     if min_samples is None:
