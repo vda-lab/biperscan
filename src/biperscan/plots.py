@@ -363,7 +363,7 @@ class LinkageHierarchy:
 
     def _id_value_map(self):
         id_value_map = np.empty(
-            (self.num_points + self.hierarchy.shape[0], 2), dtype=np.int32
+            (self.num_points + self.hierarchy.shape[0], 2), dtype=np.float32
         )
         id_value_map[: self.num_points, 0] = self.point_lens_values
         id_value_map[: self.num_points, 1] = 0
@@ -1105,7 +1105,7 @@ class SimplifiedHierarchy:
             line_kws=dict(
                 width=0.1,
                 arrows=False,
-                edge_color="k",
+                edge_color="silver",
                 edgelist=[
                     (u, v)
                     for u, v in self.hierarchy.graph.edges()
@@ -1161,7 +1161,14 @@ class SimplifiedHierarchy:
         )
 
     def plot_merges(
-        self, xs: np.ndarray, ys: np.ndarray, *, s: int = 2, title_y: float = 0.9
+        self,
+        xs: np.ndarray,
+        ys: np.ndarray,
+        *,
+        s: int = 2,
+        title_y: float = 0.9,
+        n_rows=None,
+        n_cols=None,
     ):
         """
         Plots the points in each merges in the merge hierarchy.
@@ -1176,6 +1183,10 @@ class SimplifiedHierarchy:
             The size of the points.
         title_y : float
             The y-coordinate of the title.
+        n_rows : int
+            The number of rows in the plot.
+        n_cols : int
+            The number of columns in the plot.
         linewidth : float
             The width of the arrows.
         """
@@ -1183,10 +1194,11 @@ class SimplifiedHierarchy:
         from matplotlib.colors import ListedColormap
 
         num_plots = self.tree.number_of_nodes()
-        n_cols = int(np.ceil(np.sqrt(num_plots)))
-        n_rows = n_cols
-        while n_cols * (n_rows - 1) > num_plots:
-            n_rows -= 1
+        if n_rows is None or n_cols is None:
+            n_cols = int(np.ceil(np.sqrt(num_plots)))
+            n_rows = n_cols
+            while n_cols * (n_rows - 1) > num_plots:
+                n_rows -= 1
 
         cmap = ListedColormap(["silver", "C0", "C1", "C2"])
 

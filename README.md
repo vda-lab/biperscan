@@ -64,7 +64,7 @@ support weighted cluster membership.
 ## Example Notebooks
 
 A notebook demonstrating how the algorithm works is available at [How BPSCAN
-Works](https://nbviewer.org/github/vda-lab/biperscan/blob/master/notebooks/How%20BPSCAN%20Works.ipynb).
+Works](https://nbviewer.org/github/vda-lab/biperscan/blob/main/notebooks/How_BPSCAN_works.ipynb).
 The other notebooks demonstrate the algorithm on several data sets and contain
 additional analyses.
 
