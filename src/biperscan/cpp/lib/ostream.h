@@ -80,12 +80,12 @@ std::ostream &operator<<(std::ostream &os, link_t<index_t> const &e) {
 
 template <std::unsigned_integral index_t>
 std::ostream &operator<<(std::ostream &os, merge_t<index_t> const &e) {
-  return os << std::setw(detail::HWIDTH) << e.root_one << ", "
-            << std::setw(detail::HWIDTH) << e.root_two << ", "
-            << std::setw(detail::HWIDTH) << e.start_column << ", "
+  return os << std::setw(detail::HWIDTH) << e.start_column << ", "
             << std::setw(detail::HWIDTH) << e.end_column << ", "
-            << std::setw(detail::HWIDTH) << e.side_one.size() << ", "
-            << std::setw(detail::HWIDTH) << e.side_two.size();
+            << std::setw(detail::HWIDTH) << e.parent << ", "
+            << std::setw(detail::HWIDTH) << e.child << ", "
+            << std::setw(detail::HWIDTH) << e.parent_side.size() << ", "
+            << std::setw(detail::HWIDTH) << e.child_side.size();
 }
 
 template <detail::printable_matrix matrix_t>

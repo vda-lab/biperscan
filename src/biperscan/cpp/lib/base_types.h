@@ -58,17 +58,17 @@ template <std::unsigned_integral index_t>
 struct merge_t {
   index_t start_column{};
   index_t end_column{};
-  index_t root_one{};
-  index_t root_two{};
-  std::span<index_t const> side_one{};
-  std::span<index_t const> side_two{};
+  index_t parent{};
+  index_t child{};
+  std::span<index_t const> parent_side{};
+  std::span<index_t const> child_side{};
 
   [[nodiscard]] bool operator==(merge_t const &other) const {
-    return root_one == other.root_one and root_two == other.root_two and
+    return parent == other.parent and child == other.child and
            start_column == other.start_column and
            end_column == other.end_column and
-           std::ranges::equal(side_one, other.side_one) and
-           std::ranges::equal(side_two, other.side_two);
+           std::ranges::equal(parent_side, other.parent_side) and
+           std::ranges::equal(child_side, other.child_side);
   }
 };
 

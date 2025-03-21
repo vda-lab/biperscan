@@ -32,26 +32,23 @@ TEST_SUITE_BEGIN("minimal_presentation_merges");
 
 TEST_CASE("api") {
   std::vector<std::pair<bigrade_t<unsigned long>, edge_t<unsigned>>> edges{
-      {{1ul, 15ul}, {0u, 1u}},
-      {{2ul,  1ul}, {0u, 2u}},
-      {{2ul,  2ul}, {1u, 3u}},
-      {{2ul, 10ul}, {0u, 1u}},
-      {{3ul,  5ul}, {3u, 4u}},
-      {{3ul,  7ul}, {0u, 1u}},
-      {{4ul,  3ul}, {4u, 5u}},
-      {{4ul,  4ul}, {2u, 4u}}
+      {{1ul, 15ul}, {0u, 1u}}, {{2ul, 1ul}, {0u, 2u}}, {{2ul, 2ul}, {1u, 3u}},
+      {{2ul, 10ul}, {0u, 1u}}, {{3ul, 5ul}, {3u, 4u}}, {{3ul, 7ul}, {0u, 1u}},
+      {{4ul, 3ul}, {4u, 5u}},  {{4ul, 4ul}, {2u, 4u}}
   };
   minimal_presentation_t minpres{std::from_range, edges};
   minimal_presentation_merges_t merges{
       minpres.grades(), minpres.edges(), 6ul, 2ul, 1.0
   };
 
+  // Need to exist for the lifetime of the expected_merges object!
+  constexpr std::array parent_side {0u, 2u};
+  constexpr std::array child_side {1u, 3u, 4u, 5u};
   std::vector<std::pair<bigrade_t<unsigned long>, merge_t<unsigned>>>
       expected_merges{
-        {{2ul, 10ul}, {0u, 3u, 0u, 1u, std::array{0u, 2u}, std::array{1u, 3u, 4u}}},
-        {{3ul,  7ul}, {3u, 5u, 0u, 1u, std::array{0u, 2u}, std::array{1u, 3u, 4u, 5u}}},
-        {{4ul,  5ul}, {4u, 7u, 0u, 1u, std::array{0u, 2u}, std::array{1u, 3u}}},
-
+          {{2ul, 10ul}, {0u, 3u, 0u, 1u, parent_side, std::span{child_side.begin(), child_side.end()-1}}},
+          {{3ul,  7ul}, {3u, 5u, 0u, 1u, parent_side, std::span{child_side.begin(), child_side.end()}}},
+          {{4ul,  5ul}, {4u, 7u, 0u, 1u, parent_side, std::span{child_side.begin(), child_side.end()-2}}},
       };
 
   SUBCASE("items") {
@@ -69,7 +66,7 @@ TEST_CASE("api") {
         std::views::transform(
             expected_merges,
             [](auto const &item) {
-              return edge_t{item.second.root_one, item.second.root_two};
+              return edge_t{item.second.parent, item.second.child};
             }
         ),
         merges.edges()
@@ -113,7 +110,7 @@ TEST_CASE("api") {
     CHECK(std::ranges::equal(
         new_vec,
         std::views::transform(
-            expected_merges, [](auto const &e) { return e.second.root_one; }
+            expected_merges, [](auto const &e) { return e.second.parent; }
         )
     ));
   }
@@ -123,7 +120,7 @@ TEST_CASE("api") {
     CHECK(std::ranges::equal(
         new_vec,
         std::views::transform(
-            expected_merges, [](auto const &e) { return e.second.root_two; }
+            expected_merges, [](auto const &e) { return e.second.child; }
         )
     ));
   }
@@ -148,25 +145,25 @@ TEST_CASE("api") {
     ));
   }
 
-  SUBCASE("take_sides_one") {
+  SUBCASE("take_parent_side") {
     std::vector new_vec{merges.take_parent_sides()};
     CHECK(new_vec.size() == expected_merges.size());
     for (auto const &[actual, expected] : std::views::zip(
              new_vec, std::views::transform(
                           expected_merges,
-                          [](auto const &e) { return e.second.side_one; }
+                          [](auto const &e) { return e.second.parent_side; }
                       )
          ))
       REQUIRE(std::ranges::equal(actual, expected));
   }
 
-  SUBCASE("take_sides_two") {
+  SUBCASE("take_child_side") {
     std::vector new_vec{merges.take_child_sides()};
     CHECK(new_vec.size() == expected_merges.size());
     for (auto const &[actual, expected] : std::views::zip(
              new_vec, std::views::transform(
                           expected_merges,
-                          [](auto const &e) { return e.second.side_two; }
+                          [](auto const &e) { return e.second.child_side; }
                       )
          ))
       REQUIRE(std::ranges::equal(actual, expected));
@@ -196,19 +193,19 @@ TEST_CASE("larger example (horse)") {
   auto prev_start_column = 0u;
   bigrade_t prev_grade{0u, 0u};
   for (auto const &[grade, merge] : merges.items()) {
-    REQUIRE(merge.root_one != merge.root_two);
+    REQUIRE(merge.parent != merge.child);
     REQUIRE(merge.end_column > merge.start_column);
     if (merge.start_column == prev_start_column and
         merge.end_column == prev_end_column) {
       if (cnt > 0)
         REQUIRE(prev_grade.lens == grade.lens);
       REQUIRE(prev_grade.distance < grade.distance);
-      REQUIRE(merge.side_one.size() + merge.side_two.size() > 0);
+      REQUIRE(merge.parent_side.size() + merge.child_side.size() > 0);
     } else {
-      REQUIRE(merge.side_one.size() >= 25);
-      REQUIRE(merge.side_two.size() >= 25);
+      REQUIRE(merge.parent_side.size() >= 25);
+      REQUIRE(merge.child_side.size() >= 25);
     }
-    REQUIRE(count_union(merge.side_one, merge.side_two) <= 1);
+    REQUIRE(count_union(merge.parent_side, merge.child_side) <= 1);
     prev_end_column = merge.end_column;
     prev_start_column = merge.start_column;
     prev_grade = grade;
