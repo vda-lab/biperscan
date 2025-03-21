@@ -33,15 +33,14 @@ import matplotlib.pyplot as plt
 
 from biperscan import BPSCAN
 
-data = np.load("./notebooks/data/flared_clusterable_data.npy")
+data = np.load("./notebooks/data/flared/flared_clusterable_data.npy")
 
 clusterer = BPSCAN(
     lens='negative_distance_to_median', # the lens function to use
     metric='euclidean',                 # same as in HDBSCAN
-    min_samples=25,                     # same as in HDBSCAN
+    min_samples=20,                     # same as in HDBSCAN
     min_cluster_size=80,                # same as in HDBSCAN
     distance_fraction=0.05,             # suppress noise at lower values
-    max_label_depth=1,                  # coarser clusters at lower depths
 ).fit(data)
 
 plt.figure()
