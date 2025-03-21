@@ -32,19 +32,27 @@ TEST_SUITE_BEGIN("minimal_presentation_merges");
 
 TEST_CASE("api") {
   std::vector<std::pair<bigrade_t<unsigned long>, edge_t<unsigned>>> edges{
-      {{1ul, 6ul}, {0u, 1u}}, {{2ul, 5ul}, {1u, 2u}}, {{3ul, 4ul}, {0u, 3u}},
-      {{4ul, 0ul}, {0u, 4u}}, {{4ul, 1ul}, {0u, 1u}}, {{4ul, 2ul}, {0u, 2u}},
-      {{4ul, 3ul}, {0u, 3u}}
+      {{1ul, 15ul}, {0u, 1u}},
+      {{2ul,  1ul}, {0u, 2u}},
+      {{2ul,  2ul}, {1u, 3u}},
+      {{2ul, 10ul}, {0u, 1u}},
+      {{3ul,  5ul}, {3u, 4u}},
+      {{3ul,  7ul}, {0u, 1u}},
+      {{4ul,  3ul}, {4u, 5u}},
+      {{4ul,  4ul}, {2u, 4u}}
   };
   minimal_presentation_t minpres{std::from_range, edges};
   minimal_presentation_merges_t merges{
-      minpres.grades(), minpres.edges(), 5ul, 2ul, 1.0
+      minpres.grades(), minpres.edges(), 6ul, 2ul, 1.0
   };
 
-  constexpr std::array side_one{1u, 2u};
-  constexpr std::array side_two{0u, 2u, 4u};
   std::vector<std::pair<bigrade_t<unsigned long>, merge_t<unsigned>>>
-      expected_merges{{{4ul, 0ul}, {1u, 0u, 1u, 5u, side_one, side_two}}};
+      expected_merges{
+        {{2ul, 10ul}, {0u, 3u, 0u, 1u, std::array{0u, 2u}, std::array{1u, 3u, 4u}}},
+        {{3ul,  7ul}, {3u, 5u, 0u, 1u, std::array{0u, 2u}, std::array{1u, 3u, 4u, 5u}}},
+        {{4ul,  5ul}, {4u, 7u, 0u, 1u, std::array{0u, 2u}, std::array{1u, 3u}}},
+
+      };
 
   SUBCASE("items") {
     CHECK(std::ranges::equal(expected_merges, merges.items()));
@@ -101,7 +109,7 @@ TEST_CASE("api") {
   }
 
   SUBCASE("take_roots_one") {
-    std::vector new_vec{merges.take_roots_one()};
+    std::vector new_vec{merges.take_parents()};
     CHECK(std::ranges::equal(
         new_vec,
         std::views::transform(
@@ -111,7 +119,7 @@ TEST_CASE("api") {
   }
 
   SUBCASE("take_roots_two") {
-    std::vector new_vec{merges.take_roots_two()};
+    std::vector new_vec{merges.take_children()};
     CHECK(std::ranges::equal(
         new_vec,
         std::views::transform(
@@ -141,7 +149,7 @@ TEST_CASE("api") {
   }
 
   SUBCASE("take_sides_one") {
-    std::vector new_vec{merges.take_sides_one()};
+    std::vector new_vec{merges.take_parent_sides()};
     CHECK(new_vec.size() == expected_merges.size());
     for (auto const &[actual, expected] : std::views::zip(
              new_vec, std::views::transform(
@@ -153,7 +161,7 @@ TEST_CASE("api") {
   }
 
   SUBCASE("take_sides_two") {
-    std::vector new_vec{merges.take_sides_two()};
+    std::vector new_vec{merges.take_child_sides()};
     CHECK(new_vec.size() == expected_merges.size());
     for (auto const &[actual, expected] : std::views::zip(
              new_vec, std::views::transform(
@@ -181,7 +189,7 @@ TEST_CASE("larger example (horse)") {
   minimal_presentation_merges_t merges{
       actual.grades(), actual.edges(), lens.size(), 25, 1.0
   };
-  CHECK(merges.merges().size() == 479);
+  CHECK(merges.merges().size() == 51);
 
   std::size_t cnt{0};
   auto prev_end_column = 0u;

@@ -23,17 +23,17 @@ lens = np.array([1, 1, 1, 1, 2], dtype=np.float32) - 1
 num_points = len(lens)
 
 
-def plot_graph(g, data):
+def plot_graph(g, data, labels=None, edge_labels=True):
     # Use the data coordinates as node positions
-    node_size = 100
+    node_size = 150
     pos = {i: data[i] for i in range(data.shape[0])}
     nx.draw_networkx_nodes(
         g,
         pos=pos,
         node_size=node_size,
-        node_color="blue",
+        node_color="C0",
     )
-    nx.draw_networkx_labels(g, pos=pos, font_color="w", font_size=6)
+    nx.draw_networkx_labels(g, labels=labels, pos=pos, font_color="w", font_size=8)
 
     # Count and group edges between the same two points so they can be plotted with
     # different radii and are all visible.
@@ -51,20 +51,22 @@ def plot_graph(g, data):
         nx.draw_networkx_edges(
             g,
             pos,
+            width=0.5,
             edgelist=edges.keys(),
             edge_color="black",
             arrows=True,
             node_size=node_size,
             connectionstyle=f"arc3,rad={0.4 * r/max_radius + 0.1}",
         )
-        nx.draw_networkx_edge_labels(
-            g,
-            pos,
-            edge_labels=edges,
-            node_size=node_size,
-            font_size=6,
-            connectionstyle=f"arc3,rad={0.4 * r/max_radius + 0.1}",
-        )
+        if edge_labels:
+            nx.draw_networkx_edge_labels(
+                g,
+                pos,
+                edge_labels=edges,
+                node_size=node_size,
+                font_size=8,
+                connectionstyle=f"arc3,rad={0.4 * r/max_radius + 0.1}",
+            )
     return pos
 
 
@@ -73,9 +75,9 @@ def plot_five_points_all():
     g = nx.MultiDiGraph()
     dist_grades = squareform(rankdata(dist, method="ordinal") - 1)
     for i, j in product(range(num_points), range(num_points)):
-        if i != j:
+        if i < j:
             g.add_edge(
-                i, j, grade=f"({int(max(lens[i], lens[j]))}, {int(dist_grades[i, j])})"
+                j, i, grade=f"({int(max(lens[i], lens[j]))}, {int(dist_grades[i, j])})"
             )
 
     plot_graph(g, five_points)

@@ -56,10 +56,10 @@ struct link_t {
  */
 template <std::unsigned_integral index_t>
 struct merge_t {
-  index_t root_one{};
-  index_t root_two{};
   index_t start_column{};
   index_t end_column{};
+  index_t root_one{};
+  index_t root_two{};
   std::span<index_t const> side_one{};
   std::span<index_t const> side_two{};
 

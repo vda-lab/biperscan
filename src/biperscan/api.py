@@ -1,16 +1,12 @@
-import gc
+import time
 import numpy as np
-import networkx as nx
 from joblib import Memory
 from typing import Callable
-from itertools import combinations
-from collections import defaultdict
+from scipy.stats import rankdata
 from sklearn.utils import check_array
-from sklearn.metrics import hamming_loss
 from sklearn.utils.validation import check_is_fitted
 from sklearn.neighbors import KDTree, BallTree
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 from scipy.spatial.distance import pdist, squareform
 from hdbscan._hdbscan_reachability import mutual_reachability
 
@@ -21,12 +17,7 @@ from ._impl import (
     compute_linkage_hierarchy,
     mutual_reachability_from_pdist,
 )
-from .plots import (
-    LinkageHierarchy,
-    MinimalPresentation,
-    MergeHierarchy,
-    SimplifiedHierarchy,
-)
+from .plots import LinkageHierarchy, MinimalPresentation, MergeList, SimplifiedMergeList
 
 
 KDTREE_VALID_METRICS = [
@@ -60,8 +51,8 @@ class BPSCAN(BaseEstimator, ClusterMixin):
     """
     Perform Bi-Persistence clustering. BPSCAN adapts HDBSCAN* to operate on a
     bi-filtration of the data, where the filtration is defined by a lens
-    function and a mutual reachability distance. 
-    
+    function and a mutual reachability distance.
+
     Parameters
     ----------
     min_samples : int, default=None
@@ -72,8 +63,6 @@ class BPSCAN(BaseEstimator, ClusterMixin):
     distance_fraction : float, default=1.0
         The fraction of the maximum distance grade to use a upper distance limit
         when extracting merges.
-    max_label_depth : int, default=None
-        The maximum depth to extract labels from the simplified hierarchy.
     metric : str or callable, default='euclidean'
         The metric to use when calculating distance between instances in a
         feature array. If metric is a string or callable, it must be one of the
@@ -103,26 +92,29 @@ class BPSCAN(BaseEstimator, ClusterMixin):
         The lens grade for each point.
     minimal_presentation_ : :class:`~biperscan.plots.MinimalPresentation`
         The minimal presentation of the bi-filtration.
-    merge_hierarchy_ : :class:`~biperscan.plots.MergeHierarchy`
-        The merge hierarchy graph.
-    simplified_hierarchy_ : :class:`~biperscan.plots.SimplifiedHierarchy`
-        The simplified hierarchy graph.
+    merges_ : :class:`~biperscan.plots.MergeList`
+        The detected merges.
+    simplified_merges_ : :class:`~biperscan.plots.SimplifiedHierarchy`
+        The simplified merges.
     linkage_hierarchy_ : :class:`~biperscan.plots.LinkageHierarchy`
         The linkage hierarchy graph. This property is computed on demand and not
-        cached. 
+        cached.
+    membership_ : array of shape (n_samples,n_groups)
+        A binary membership matrix indicating which points belong to which
+        groups. Groups can overlap and relate to the child and parent sides of
+        the simplified merges.
     labels_ : array of shape (n_samples,)
-        The computed cluster labels.
-    membership_ : array of shape (n_samples, n_clusters)
-        A binary matrix indicating which points are members of which clusters.
-        Columns are ordered by the merge hierarchy, so that the first non-zero
-        column can be used to extract a labelling. Cluster membership overlaps.
+        The computed cluster labels. The labels identify points with the same
+        membership combinations.
+    timers_ : dict
+        The time spent on each step of the clustering process.
     """
+
     def __init__(
         self,
         min_samples: int | None = None,
         min_cluster_size: int = 10,
         distance_fraction: float = 1.0,
-        max_label_depth: int | None = None,
         metric: str | Callable = "euclidean",
         metric_kws: dict | None = None,
         lens: str | Callable | np.ndarray[np.float32] = "negative_distance_to_median",
@@ -133,7 +125,6 @@ class BPSCAN(BaseEstimator, ClusterMixin):
         self.min_samples = min_samples
         self.min_cluster_size = min_cluster_size
         self.distance_fraction = distance_fraction
-        self.max_label_depth = max_label_depth
         self.metric = metric
         self.metric_kws = metric_kws
         self.lens = lens
@@ -164,9 +155,10 @@ class BPSCAN(BaseEstimator, ClusterMixin):
             self._row_to_point,
             self._minimal_presentation,
             self._merges,
-            self._merge_hierarchy,
-            self._simplified_hierarchy,
+            self._simplified_merges,
+            self.membership_,
             self.labels_,
+            self.timers_,
         ) = bpscan(X, **self.get_params())
         return self
 
@@ -183,36 +175,36 @@ class BPSCAN(BaseEstimator, ClusterMixin):
         )
 
     @property
-    def merge_hierarchy_(self):
+    def merges_(self):
         check_is_fitted(self, "_minimal_presentation")
-        return MergeHierarchy(
+        return MergeList(
             self.distances_,
             self.lens_values_,
             self._col_to_edge,
             self._row_to_point,
             self._minimal_presentation,
-            self._merge_hierarchy,
+            self._merges,
         )
 
     @property
-    def simplified_hierarchy_(self):
+    def simplified_merges_(self):
         check_is_fitted(self, "_minimal_presentation")
-        return SimplifiedHierarchy(
+        return SimplifiedMergeList(
             self.distances_,
             self.lens_values_,
             self._col_to_edge,
             self._row_to_point,
             self._minimal_presentation,
-            self._merge_hierarchy,
-            self._simplified_hierarchy,
+            self._simplified_merges,
         )
 
     @property
     def linkage_hierarchy_(self):
         check_is_fitted(self, "_minimal_presentation")
-        self._linkage_hierarchy = compute_linkage_hierarchy(
+        self._linkage_hierarchy, linkage_time = compute_linkage_hierarchy(
             self._minimal_presentation, self._row_to_point
         )
+        self.timers_["linkage"] = linkage_time
         return LinkageHierarchy(
             self.distances_,
             self.lens_values_,
@@ -222,71 +214,6 @@ class BPSCAN(BaseEstimator, ClusterMixin):
             self._linkage_hierarchy,
         )
 
-    @property
-    def membership_(self):
-        check_is_fitted(self, "_minimal_presentation")
-        membership = np.zeros(
-            (len(self.lens_values_), len(self._simplified_hierarchy) * 2)
-        )
-        i = 0
-        visited = set()
-        for root in sorted(
-            [
-                x
-                for x in self._simplified_hierarchy
-                if self._simplified_hierarchy.in_degree(x) == 0
-            ],
-            reverse=True,
-        ):
-            for node in nx.dfs_postorder_nodes(self._simplified_hierarchy, source=root):
-                if node in visited:
-                    continue
-                visited.add(node)
-                for side in [
-                    self._simplified_hierarchy.nodes[node]["parent_side"],
-                    self._simplified_hierarchy.nodes[node]["child_side"],
-                ]:
-                    pts_one = [self._row_to_point[pt] for pt in side]
-                    membership[pts_one, i] = 1
-                    i += 1
-
-        return membership
-
-    def labels_at_depth(self, depth: int | None = None):
-        """Recomputes labels from the simplified hierarchy.
-        
-        Parameters
-        ----------
-        depth : int or None, default=None
-            The maximum depth to extract labels from the simplified hierarchy.
-        
-        Returns
-        -------
-        labels : array of shape (n_samples,)
-            The computed cluster labels.
-        """
-        check_is_fitted(self, "_minimal_presentation")
-        return _extract_labels(
-            self._simplified_hierarchy,
-            self._row_to_point,
-            self.min_cluster_size,
-            len(self.lens_values_),
-            depth_limit=depth,
-        )
-
-    def first_nonzero_membership(self):
-        """Return the first non-zero members column index."""
-        check_is_fitted(self, "_minimal_presentation")
-
-        def first_nonzero_index(array):
-            fnzi = -1  # first non-zero index
-            indices = np.flatnonzero(array)
-            if len(indices) > 0:
-                fnzi = indices[0]
-            return fnzi
-
-        return np.apply_along_axis(first_nonzero_index, 1, self.membership_)
-
 
 def bpscan(
     X,
@@ -294,7 +221,6 @@ def bpscan(
     min_samples: int | None = None,
     min_cluster_size: int = 10,
     distance_fraction: float = 1.0,
-    max_label_depth: int | None = None,
     metric: str | Callable = "euclidean",
     metric_kws: dict | None = None,
     lens: (
@@ -311,8 +237,8 @@ def bpscan(
     Parameters
     ----------
     X : array of shape (n_samples, n_features), or \
-        array of shape (1, n_samples * (n_samples - 1) // 2)
-        A feature array, or condensed distance array if metric='precomputed'.
+        array of shape (1, n_samples * (n_samples - 1) // 2) A feature array, or
+        condensed distance array if metric='precomputed'.
     min_samples : int, default=None
         The number of samples in a neighborhood for a point to be considered as
         a core point. If None, defaults to min_cluster_size.
@@ -321,8 +247,6 @@ def bpscan(
     distance_fraction : float, default=1.0
         The fraction of the maximum distance grade to use a upper distance limit
         when extracting merges.
-    max_label_depth : int, default=None
-        The maximum depth to extract labels from the simplified hierarchy.
     metric : str or callable, default='euclidean'
         The metric to use when calculating distance between instances in a
         feature array. If metric is a string or callable, it must be one of the
@@ -359,19 +283,20 @@ def bpscan(
         keys: 'lens_grade', 'distance_grade', 'parent', 'child'.
     merges : dict
         The merges extracted from the minimal presentation. Contains the
-        following keys: 'start_column', 'end_column', 'root_one', 'root_two',
-        'side_one', 'side_two', 'lens_grade', 'distance_grade'. Merges are
-        ordered with increasing end column. Rows with the same 'start_column'
-        and 'end_column' pairs indicate merges that originate from the same
-        edges. Take the data point union over 'side_one' and 'side_two' for all
-        rows with the same 'start_column' and 'end_column' up to the row being
-        processed to find all points included in the row being processed!
-    merge_hierarchy : networkx.DiGraph
-        The merge hierarchy graph.
-    simplified_hierarchy : networkx.DiGraph
-        The simplified hierarchy graph.
+        following keys: 'start_column', 'end_column', 'lens_grade',
+        'distance_grade', 'parent', 'child', 'parent_side', 'child_side'. Merges
+        are ordered by increasing end column.
+    simplified_merges : dict
+        The merges that remain after combining similar merges. Contains the 
+        following keys: 'parent', 'child', 'parent_side', 'child_side'.
+    membership : array of shape (n_samples,n_groups)
+        A binary membership matrix indicating which points belong to which
+        groups. Groups can overlap and relate to the child and parent sides
+        of the simplified merges.
     labels : array of shape (n_samples,)
         The computed cluster labels.
+    timers : dict
+        The time spent on each step of the clustering process.
     """
     X = check_array(X, ensure_all_finite=True, ensure_2d=metric != "precomputed")
 
@@ -405,6 +330,7 @@ def bpscan(
 
     # Compute the distance matrix
     if metric == "precomputed":
+        distance_time = 0
         reachability = X.astype(np.float32)
     else:
         if metric in KDTREE_VALID_METRICS:
@@ -423,20 +349,22 @@ def bpscan(
             compute_reachability = _balltree_mutual_reachability
         else:
             compute_reachability = _slow_mutual_reachability
-        reachability = memory.cache(_as_float32)(
+        reachability, distance_time = memory.cache(_as_float32)(
             compute_reachability, X, metric, min_points=min_samples, **metric_kws
         )
 
     # Compute the lens values
     if type(lens) is np.ndarray:
         # implementation expects 32bit floats!
+        lens_time = 0
         point_lens = check_array(lens, ensure_2d=False).astype(np.float32)
     else:
         if isinstance(lens, str) and lens in available_lenses:
             lens_fun = available_lenses[lens]
         elif isinstance(lens, Callable):
             lens_fun = lens
-        point_lens = memory.cache(lens_fun)(
+        point_lens, lens_time = memory.cache(_timed)(
+            lens_fun,
             X if metric != "precomputed" else None,
             reachability,
             metric=metric,
@@ -445,22 +373,39 @@ def bpscan(
         )
 
     # Compute bi-filtration minimal presentation
-    (col_to_edge, row_to_point, point_lens_grades, minimum_presentation) = memory.cache(
-        compute_minimal_presentation
-    )(reachability, point_lens)
+    (
+        col_to_edge,
+        row_to_point,
+        point_lens_grades,
+        minimum_presentation,
+        matrix_time,
+        minpres_time,
+    ) = memory.cache(compute_minimal_presentation)(reachability, point_lens)
 
     # Extract merge hierarchy from the minimal presentation
-    simplified_hierarchy, merge_hierarchy, merges = memory.cache(
-        _compute_merge_hierarchy
+    (
+        merges,
+        merge_time,
+        simplified_merges,
+        simplify_time,
+    ) = memory.cache(
+        _compute_merges
     )(minimum_presentation, len(point_lens), min_cluster_size, distance_fraction)
 
     # Compute segmentation
-    labels = memory.cache(_extract_labels)(
-        simplified_hierarchy,
-        row_to_point,
-        min_cluster_size,
-        len(point_lens),
-        depth_limit=max_label_depth,
+    (labels, membership), label_time = memory.cache(_timed)(
+        _extract_labels, simplified_merges, row_to_point
+    )
+
+    # Collect times
+    times = dict(
+        distances=distance_time,
+        lens_values=lens_time,
+        matrix=matrix_time,
+        minpres=minpres_time,
+        merges=merge_time,
+        simplify=simplify_time,
+        labels=label_time,
     )
 
     return (
@@ -471,325 +416,140 @@ def bpscan(
         row_to_point,
         minimum_presentation,
         merges,
-        merge_hierarchy,
-        simplified_hierarchy,
+        simplified_merges,
+        membership,
         labels,
+        times,
     )
 
 
 def _kdtree_mutual_reachability(X, metric, min_points=5, **kwargs):
+    start = time.perf_counter()
     tree = KDTree(X, metric=metric, **kwargs)
     min_points = min(X.shape[0] - 1, min_points)
     core_distances = tree.query(X, k=min_points)[0][:, -1]
-    del tree
-    gc.collect()
 
     dists = pdist(X, metric=metric, **kwargs)
     dists = mutual_reachability_from_pdist(core_distances, dists, X.shape[0])
-    return dists
+    duration = time.perf_counter() - start
+    return dists, duration
 
 
 def _balltree_mutual_reachability(X, metric, min_points=5, **kwargs):
+    start = time.perf_counter()
     tree = BallTree(X, metric=metric, **kwargs)
     min_points = min(X.shape[0] - 1, min_points)
     core_distances = tree.query(X, k=min_points)[0][:, -1]
-    del tree
-    gc.collect()
 
     dists = pdist(X, metric=metric, **kwargs)
     dists = mutual_reachability_from_pdist(core_distances, dists, X.shape[0])
-    return dists
+    duration = time.perf_counter() - start
+    return dists, duration
 
 
 def _slow_mutual_reachability(X, metric, min_points=5, **kwargs):
     """Computes condensed mutual reachability matrix for the given data."""
+    start = time.perf_counter()
     dists = pdist(X, metric=metric, **kwargs) if metric != "precomputed" else X
-    return squareform(
+    mreach = squareform(
         mutual_reachability(squareform(dists), min_points=min_points), checks=False
     )
+    duration = time.perf_counter() - start
+    return mreach, duration
 
 
 def _as_float32(fun, *args, **kwargs):
     """Wraps a function to cast its output to float32."""
-    return fun(*args, **kwargs).astype(np.float32)
+    res = fun(*args, **kwargs)
+    return (res[0].astype(np.float32), res[1])
 
 
-def _compute_merge_hierarchy(
+def _compute_merges(
     minimal_presentation, num_points, min_cluster_size, distance_fraction
 ):
     """Extracts merges from the minimal presentation and creates a
     hierarchy connecting merges if they evolve into each other."""
-    merges = compute_minpres_merges(
+    merges, merge_time = compute_minpres_merges(
         minimal_presentation, num_points, min_cluster_size, distance_fraction
     )
-    hierarchy = _merges_to_graph(merges, num_points)
-    simplified_hierarchy = _simplify_merge_hierarchy(hierarchy)
-    return simplified_hierarchy, hierarchy, merges
 
+    start = time.perf_counter()
+    simplified_merges = _combine_merges(merges)
+    simplify_time = time.perf_counter() - start
 
-def _merges_to_graph(merges, num_points):
-    """Converts a merge dictionary to a directed graph."""
-    # allocate hierarchy data structures
-    edge_to_node = dict()
-    hierarchy = nx.DiGraph()
-    fore_graph = defaultdict(set)
-    back_graph = defaultdict(set)
-
-    # find boundaries for merges originating from the same column
-    column_groups = [0] + (
-        np.nonzero(np.diff(merges["start_column"]) + np.diff(merges["end_column"]))[0]
-        + 1
-    ).tolist()
-
-    # add merges as nodes, iterates over merges backwards to keep only the
-    # highest lens + distance merge between the same points
-    cnt = 0
-    end = len(merges["start_column"]) - 1
-    for start in column_groups[::-1]:
-        for idx in range(end, start - 1, -1):
-            parent, child, parent_side, child_side = _points_of_merge(
-                merges, start, idx
-            )
-            if (parent, child) in edge_to_node:
-                continue
-
-            edge_to_node[(parent, child)] = cnt
-            fore_graph[parent].add(child)
-            back_graph[child].add(parent)
-            hierarchy.add_node(
-                cnt,
-                lens_grade=merges["lens_grade"][idx],
-                distance_grade=merges["distance_grade"][idx],
-                parent=parent,
-                child=child,
-                parent_side=set.union(*[set(pts) for pts in parent_side]),
-                child_side=set.union(*[set(pts) for pts in child_side]),
-            )
-            cnt += 1
-        end = start - 1
-
-    # add same parent and same child edges
-    for graph, relation in zip([fore_graph, back_graph], ["parent", "child"]):
-        prefix = "parent" if relation == "child" else "child"
-        for point, neighbors in graph.items():
-            for neighbor_one, neighbor_two in combinations(neighbors, 2):
-                if neighbor_two < neighbor_one:
-                    neighbor_one, neighbor_two = neighbor_two, neighbor_one
-                if relation == "parent":
-                    node_lower = edge_to_node[(point, neighbor_one)]
-                    node_higher = edge_to_node[(point, neighbor_two)]
-                else:
-                    node_lower = edge_to_node[(neighbor_one, point)]
-                    node_higher = edge_to_node[(neighbor_two, point)]
-                if neighbor_two in hierarchy.nodes[node_lower][f"{prefix}_side"]:
-                    edge_type = f"same_{relation}"
-                else:
-                    edge_type = f"into_{relation}"
-                hierarchy.add_edge(node_higher, node_lower, type=edge_type)
-
-    # add parent as child edges
-    for parent, descendants in fore_graph.items():
-        for grand_parent in back_graph[parent]:
-            parent_node = edge_to_node[(grand_parent, parent)]
-            for child in descendants:
-                child_node = edge_to_node[(parent, child)]
-                hierarchy.add_edge(child_node, parent_node, type="into_child")
-
-    # connect the remaining components through most similar merges.
-    # (implemented as naive MST construction, could be sped up)
-    num_nodes = hierarchy.number_of_nodes()
-    vectors = np.zeros((num_nodes, num_points), dtype=np.uint32)
-    for parent, descendants in fore_graph.items():
-        for child in descendants:
-            node = edge_to_node[(parent, child)]
-            vectors[node, list(hierarchy.nodes[node]["parent_side"])] = 1
-            vectors[node, list(hierarchy.nodes[node]["child_side"])] = 2
-
-    while True:
-        components = list(
-            nx.connected_components(hierarchy.to_undirected(as_view=True))
-        )
-        if len(components) == 1:
-            break
-
-        for component_ids in components:
-            other_ids = set(range(num_nodes)) - component_ids
-            in_rows = list(component_ids)
-            out_rows = list(other_ids)
-            closest_column, distances = pairwise_distances_argmin_min(
-                vectors[in_rows], vectors[out_rows], metric=hamming_loss
-            )
-            row = distances.argmin()
-            col = closest_column[row]
-            if in_rows[row] in hierarchy[out_rows[col]]:
-                continue
-            hierarchy.add_edge(in_rows[row], out_rows[col], type="duplicate")
-
-    return hierarchy
-
-
-def _points_of_merge(merges, start, idx):
-    """
-    Returns the points on both sides of the merge at index `idx`. Parent and
-    child sides are ordered by root point. Points are stored incrementally,
-    `start` indicates the first index of the column from which merge `idx`
-    originates.
-    """
-    parent = merges["root_one"][idx]
-    child = merges["root_two"][idx]
-    parent_side = merges["side_one"][start : idx + 1]
-    child_side = merges["side_two"][start : idx + 1]
-    if child < parent:
-        parent, child = child, parent
-        parent_side, child_side = child_side, parent_side
-    return parent, child, parent_side, child_side
-
-
-def _simplify_merge_hierarchy(hierarchy):
-    # extract connected components
-    components = list(
-        nx.connected_components(
-            nx.subgraph_view(
-                hierarchy,
-                filter_edge=lambda u, v: hierarchy[u][v]["type"]
-                not in ["into_child", "into_parent"],
-            ).to_undirected()
-        )
+    return (
+        merges,
+        merge_time,
+        simplified_merges,
+        simplify_time,
     )
-    comp_labels = np.empty(len(hierarchy), dtype=np.uint32)
-    for i, component in enumerate(components):
-        comp_labels[list(component)] = i
-
-    # aggregate components into nodes
-    simplified_hierarchy = nx.DiGraph()
-    for i, component in enumerate(components):
-        simplified_hierarchy.add_node(
-            i,
-            merges=component,
-            root=min(hierarchy.nodes[pt]["parent"] for pt in component),
-            parent_side=set.union(
-                *[hierarchy.nodes[pt]["parent_side"] for pt in component]
-            ),
-            child_side=set.union(
-                *[hierarchy.nodes[pt]["child_side"] for pt in component]
-            ),
-        )
-
-    # aggregate hierarchy edges between components
-    for u, v in hierarchy.edges():
-        edge_type = hierarchy[u][v]["type"]
-        if edge_type not in ["into_child", "into_parent"]:
-            continue
-
-        # skip edges between the same component
-        comp_u = comp_labels[u]
-        comp_v = comp_labels[v]
-        if comp_u == comp_v:
-            continue
-
-        # take lowest root as parent (highest lens as tiebreaker)
-        root_u = simplified_hierarchy.nodes[comp_u]["root"]
-        root_v = simplified_hierarchy.nodes[comp_v]["root"]
-        if root_u == root_v:
-            lens_u = hierarchy.nodes[u]["lens_grade"]
-            lens_v = hierarchy.nodes[v]["lens_grade"]
-            if lens_u < lens_v:
-                comp_u, comp_v = comp_v, comp_u
-        elif root_u > root_v:
-            comp_u, comp_v = comp_v, comp_u
-
-        # add the edge
-        if comp_u in simplified_hierarchy[comp_v]:
-            continue
-        if (
-            comp_v in simplified_hierarchy[comp_u]
-            and simplified_hierarchy[comp_u][comp_v]["type"] != edge_type
-        ):
-            edge_type = "both"
-        simplified_hierarchy.add_edge(comp_u, comp_v, type=edge_type)
-
-    return simplified_hierarchy
 
 
-def _extract_labels(
-    simplified_hierarchy, row_to_point, min_cluster_size, num_points, depth_limit=None
-):
-    if depth_limit is None:
-        depth_limit = len(simplified_hierarchy)
+def _combine_merges(merges):
+    def isin(sorted_arr, key):
+        idx = np.searchsorted(sorted_arr, key)
+        return idx < len(sorted_arr) and sorted_arr[idx] == key
 
-    visited = set()
+    groups = []
 
-    def traverse_down(g, node, assigned_points, depth):
-        # extract the sides
-        parent_side = g.nodes[node]["parent_side"]
-        child_side = g.nodes[node]["child_side"]
+    num_merges = len(merges["parent"])
+    for i in range(num_merges - 1, -1, -1):
+        child = merges["child"][i]
+        parent = merges["parent"][i]
+        child_points = merges["child_side"][i]
+        parent_points = merges["parent_side"][i]
+        bigrade = (merges["lens_grade"][i], merges["distance_grade"][i])
 
-        # process the children, let them update the current child & parent sides!
-        groups = []
-        last_child = None
-        last_parent = None
-        if depth < depth_limit:
-            for child in g[node]:
-                if child in visited:
-                    continue
-                visited.add(child)
-                child_groups, assigned_points, prev_group, _ = traverse_down(
-                    g, child, assigned_points, depth + 1
+        for j, ((pr, pl), (cr, cl), gs) in enumerate(groups):
+            if isin(child_points, cr) and isin(parent_points, pr):
+                groups[j] = (
+                    (parent, np.union1d(pl, parent_points)),
+                    (child, np.union1d(cl, child_points)),
+                    [bigrade] + gs,
                 )
-                groups.extend(child_groups)
-                if g[node][child]["type"] == "into_child":
-                    last_child = prev_group
-                else:
-                    last_parent = prev_group
-
-        # create new groups from the remaining points
-        new_group = child_side - assigned_points
-        if last_child is not None and len(new_group) < min_cluster_size:
-            last_child.update(new_group)
+                groups = sorted(groups, key=lambda x: x[0][0])
+                break
         else:
-            groups.append(new_group)
-            last_child = new_group
-        assigned_points.update(new_group)
+            groups.append(((parent, parent_points), (child, child_points), [bigrade]))
+            groups = sorted(groups, key=lambda x: x[0][0])
 
-        new_group = parent_side - assigned_points
-        if last_parent is not None and len(new_group) < min_cluster_size:
-            last_parent.update(new_group)
-        else:
-            groups.append(new_group)
-            last_parent = new_group
-
-        assigned_points.update(new_group)
-
-        # return detected groups and remaining points
-        return groups, assigned_points, new_group, last_child
-
-    # actual traversal
-    roots = sorted(
-        [x for x in simplified_hierarchy if simplified_hierarchy.in_degree(x) == 0],
-        reverse=True,
+    return dict(
+        parent=[g[0][0] for g in groups],
+        child=[g[1][0] for g in groups],
+        parent_side=[g[0][1] for g in groups],
+        child_side=[np.setdiff1d(g[1][1], g[0][1], assume_unique=True) for g in groups],
+        grade_trace=[
+            dict(
+                lens_grade=[bg[0] for bg in g[2]],
+                distance_grade=[bg[1] for bg in g[2]],
+            )
+            for g in groups
+        ],
     )
-    for root in roots:
-        groups, assigned_points, last_parent, last_child = traverse_down(
-            simplified_hierarchy, root, set(), 0
-        )
 
-        remaining_group = (
-            simplified_hierarchy.nodes[root]["child_side"] - assigned_points
-        )
-        if len(remaining_group) > min_cluster_size:
-            groups.append(remaining_group)
-        else:
-            last_child.update(remaining_group)
 
-        remaining_group = (
-            simplified_hierarchy.nodes[root]["parent_side"] - assigned_points
-        )
-        if len(remaining_group) > min_cluster_size:
-            groups.append(remaining_group)
-        else:
-            last_parent.update(remaining_group)
+def _extract_labels(simplified_merges, row_to_point):
+    num_merges = len(simplified_merges["parent"])
+    membership = np.zeros((len(row_to_point), num_merges * 2), dtype=np.int32)
+    for i, (parent_side, child_side) in enumerate(
+        zip(simplified_merges["parent_side"], simplified_merges["child_side"])
+    ):
+        membership[row_to_point[parent_side], i * 2] = np.int32(1)
+        membership[row_to_point[child_side], i * 2 + 1] = np.int32(1)
 
-    labels = np.full(num_points, -1, dtype=np.int32)
-    for i, group in enumerate(groups):
-        labels[row_to_point[list(group)]] = i
-    return labels
+    bases = np.power(2, np.arange(membership.shape[1]))
+    identifiers = (membership * bases).sum(axis=1)
+
+    # uniques, counts = np.unique(identifiers, return_counts=True)
+    # for id in uniques[counts < min_cluster_size]:
+    #     identifiers[identifiers == id] = 0
+
+    labels = rankdata(identifiers, method="dense") - 2
+    return labels, membership
+
+
+def _timed(fun, *args, **kwargs):
+    start = time.perf_counter()
+    out = fun(*args, **kwargs)
+    duration = time.perf_counter() - start
+    return out, duration

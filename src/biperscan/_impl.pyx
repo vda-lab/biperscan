@@ -146,8 +146,12 @@ def compute_minimal_presentation(np.ndarray[np.float32_t, ndim=1] distances not 
     child=minpres_child,
   )
 
+  # Decode times
+  cdef double matrix_time = res.matrix_time
+  cdef double minpres_time = res.minpres_time
+
   # Return result
-  return (col_to_edge, row_to_point, lens_grades, minpres)
+  return (col_to_edge, row_to_point, lens_grades, minpres, matrix_time, minpres_time)
 
 
 @cython.boundscheck(False)
@@ -190,30 +194,36 @@ def compute_minpres_merges(dict minpres not None,
   )
   
   # Decode hierarchy
-  cdef np.ndarray[np.uint32_t, ndim=1] merge_lens_grade = UnsignedWrapper().as_array(res.merge_lens_grades)
-  cdef np.ndarray[np.uint32_t, ndim=1] merge_distance_grade = UnsignedWrapper().as_array(res.merge_distance_grades)
-  cdef np.ndarray[np.uint32_t, ndim=1] merge_root_one = UnsignedWrapper().as_array(res.merge_roots_one)
-  cdef np.ndarray[np.uint32_t, ndim=1] merge_root_two = UnsignedWrapper().as_array(res.merge_roots_two)
   cdef np.ndarray[np.uint32_t, ndim=1] merge_start_column = UnsignedWrapper().as_array(res.merge_start_columns)
   cdef np.ndarray[np.uint32_t, ndim=1] merge_end_column = UnsignedWrapper().as_array(res.merge_end_columns)
-  cdef list merge_side_one = [
-    UnsignedWrapper().as_array(res.merge_sides_one[i]) 
-    for i in range(len(res.merge_sides_one))
+  cdef np.ndarray[np.uint32_t, ndim=1] merge_lens_grade = UnsignedWrapper().as_array(res.merge_lens_grades)
+  cdef np.ndarray[np.uint32_t, ndim=1] merge_distance_grade = UnsignedWrapper().as_array(res.merge_distance_grades)
+  cdef np.ndarray[np.uint32_t, ndim=1] merge_parent = UnsignedWrapper().as_array(res.merge_parents)
+  cdef np.ndarray[np.uint32_t, ndim=1] merge_child = UnsignedWrapper().as_array(res.merge_children)
+  cdef list merge_parent_side = [
+    UnsignedWrapper().as_array(res.merge_parent_sides[i]) 
+    for i in range(len(res.merge_parent_sides))
   ]
-  cdef list merge_side_two = [
-    UnsignedWrapper().as_array(res.merge_sides_two[i]) 
-    for i in range(len(res.merge_sides_two))
+  cdef list merge_child_side = [
+    UnsignedWrapper().as_array(res.merge_child_sides[i]) 
+    for i in range(len(res.merge_child_sides))
   ]
-  return dict(
-    lens_grade=merge_lens_grade,
-    distance_grade=merge_distance_grade,
-    root_one=merge_root_one,
-    root_two=merge_root_two,
+  merges = dict(
     start_column=merge_start_column,
     end_column=merge_end_column,
-    side_one=merge_side_one,
-    side_two=merge_side_two,
+    lens_grade=merge_lens_grade,
+    distance_grade=merge_distance_grade,
+    parent=merge_parent,
+    child=merge_child,
+    parent_side=merge_parent_side,
+    child_side=merge_child_side,
   )
+
+  # Decode times
+  cdef double merge_time = res.merge_time
+
+  # Return result
+  return merges, merge_time
 
 
 @cython.boundscheck(False)
@@ -262,7 +272,7 @@ def compute_linkage_hierarchy(dict minpres not None,
       linkage_child[idx] = row_to_point[value]
   cdef np.ndarray[np.uint32_t, ndim=1] linkage_parent_root = UnsignedWrapper().as_array(res.linkage_parent_roots)
   cdef np.ndarray[np.uint32_t, ndim=1] linkage_child_root = UnsignedWrapper().as_array(res.linkage_child_roots)
-  return dict(
+  hierarchy = dict(
     lens_grade=linkage_lens_grade,
     distance_grade=linkage_distance_grade,
     parent=linkage_parent,
@@ -270,6 +280,12 @@ def compute_linkage_hierarchy(dict minpres not None,
     parent_root=linkage_parent_root,
     child_root=linkage_child_root,
   )
+
+  # Decode times
+  cdef double linkage_time = res.linkage_time
+
+  # Return result
+  return hierarchy, linkage_time
   
   
 @cython.boundscheck(False)

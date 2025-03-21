@@ -15,7 +15,8 @@ int main() {
       ranks.data(), ranks.size(), lens.data(), lens.size()
   );
 
-  std::cout << "Minimal presentation\n";
+  std::cout << "Matrix in " << result.matrix_time << "s\n";
+  std::cout << "Minimal presentation in " << result.minpres_time << "s:\n";
   for (auto const &[lens, distance, parent, child] : std::views::zip(
            result.minpres_lens_grades, result.minpres_distance_grades,
            result.minpres_parents, result.minpres_children
@@ -29,10 +30,10 @@ int main() {
       result.minpres_parents.data(), result.minpres_children.data(),
       result.minpres_lens_grades.size(), lens.size(), 2, 1.0
   );
-  std::cout << "\nMerges:\n";
+  std::cout << "\nMerges in " << m_result.merge_time << "s:\n";
   for (auto const &[lens, distance, parent, child] : std::views::zip(
            m_result.merge_lens_grades, m_result.merge_distance_grades,
-           m_result.merge_parents, m_result.merge_children
+           m_result.merge_roots_one, m_result.merge_roots_two
        ))
     std::cout << bigrade_t{lens, distance} << ' ' << edge_t{parent, child}
               << '\n';
@@ -43,7 +44,7 @@ int main() {
       result.minpres_parents.data(), result.minpres_children.data(),
       result.minpres_lens_grades.size(), lens.size()
   );
-  std::cout << "\nLinkage hierarchy\n";
+  std::cout << "\nLinkage hierarchy in " << l_result.linkage_time << "s\n";
   std::size_t id = lens.size();
   for (auto const &[lens, distance, parent, child, parent_root, child_root] :
        std::views::zip(

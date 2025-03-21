@@ -15,17 +15,22 @@ cdef extern from "cpp/py_biperscan.h" namespace "bppc::python":
     vector[grade_t] minpres_distance_grades;
     vector[index_t] minpres_parents;
     vector[index_t] minpres_children;
+
+    double matrix_time;
+    double minpres_time;
     
 
   cdef cppclass biperscan_merge_result_t[index_t, grade_t]:
-    vector[grade_t] merge_lens_grades;
-    vector[grade_t] merge_distance_grades;
-    vector[index_t] merge_roots_one;
-    vector[index_t] merge_roots_two;
     vector[index_t] merge_start_columns;
     vector[index_t] merge_end_columns;
-    vector[vector[index_t]] merge_sides_one;
-    vector[vector[index_t]] merge_sides_two;
+    vector[grade_t] merge_lens_grades;
+    vector[grade_t] merge_distance_grades;
+    vector[index_t] merge_parents;
+    vector[index_t] merge_children;
+    vector[vector[index_t]] merge_parent_sides;
+    vector[vector[index_t]] merge_child_sides;
+
+    double merge_time;
 
 
   cdef cppclass biperscan_linkage_result_t[index_t, grade_t]:
@@ -35,6 +40,8 @@ cdef extern from "cpp/py_biperscan.h" namespace "bppc::python":
     vector[index_t] linkage_children;
     vector[index_t] linkage_parent_roots;
     vector[index_t] linkage_child_roots;
+
+    double linkage_time;
 
 
   cdef pair[value_t, value_t] minmax_of[value_t](value_t *values_ptr, size_t num_values)

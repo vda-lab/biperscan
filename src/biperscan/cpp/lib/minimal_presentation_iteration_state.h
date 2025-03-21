@@ -31,7 +31,6 @@ class minpres_iterator_t {
 
   // Traversal state
   index_t d_root = 0;
-  std::size_t d_num_previous_children = 0;
   std::vector<index_t> d_children{};
 
  public:
@@ -49,11 +48,8 @@ class minpres_iterator_t {
         d_children({root}) {
     d_enqueued[root] = true;
     d_visited[root] = true;
-    if (connecting_point) {
+    if (connecting_point)
       d_enqueued[*connecting_point] = true;
-      d_visited[*connecting_point] = true;
-      d_children.push_back(*connecting_point);
-    }
     enqueue_children(root);
   }
 
@@ -81,11 +77,10 @@ class minpres_iterator_t {
     return d_root;
   }
   [[nodiscard]] std::size_t num_children() const {
-    return d_num_previous_children + d_children.size();
+    return d_children.size();
   }
-  void swap_children(std::vector<index_t> &other) {
-    d_num_previous_children += d_children.size();
-    other.swap(d_children);
+  [[nodiscard]] std::vector<index_t> &&take_children() {
+    return std::move(d_children);
   }
 
  private:

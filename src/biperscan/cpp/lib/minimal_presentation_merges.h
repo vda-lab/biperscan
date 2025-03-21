@@ -14,14 +14,14 @@ class minimal_presentation_merges_t {
   using value_t = std::pair<bigrade_t, edge_t>;
 
   // Private data members
-  std::vector<grade_t> d_lens_grades{};
-  std::vector<grade_t> d_distance_grades{};
-  std::vector<index_t> d_roots_one{};
-  std::vector<index_t> d_roots_two{};
   std::vector<index_t> d_start_columns{};
   std::vector<index_t> d_end_columns{};
-  std::vector<std::vector<index_t>> d_sides_one{};
-  std::vector<std::vector<index_t>> d_sides_two{};
+  std::vector<grade_t> d_lens_grades{};
+  std::vector<grade_t> d_distance_grades{};
+  std::vector<index_t> d_parents{};
+  std::vector<index_t> d_children{};
+  std::vector<std::vector<index_t>> d_parent_sides{};
+  std::vector<std::vector<index_t>> d_child_sides{};
 
  public:
   template <view_of<edge_t> edge_view_t, view_of<bigrade_t> grade_view_t>
@@ -65,69 +65,69 @@ class minimal_presentation_merges_t {
   [[nodiscard]] view_of<edge_t> auto edges() const {
     return std::views::zip_transform(
         [](auto... args) { return edge_t{args...}; },
-        std::views::all(d_roots_one), std::views::all(d_roots_two)
+        std::views::all(d_parents), std::views::all(d_children)
     );
   }
   [[nodiscard]] view_of<merge_t> auto merges() const {
     return std::views::zip_transform(
-        [](index_t root_one, index_t root_two, index_t start_column,
-           index_t end_column, std::vector<index_t> const &side_one,
-           std::vector<index_t> const &side_two) {
+        [](index_t start_column, index_t end_column, index_t parent,
+           index_t child, std::vector<index_t> const &parent_side,
+           std::vector<index_t> const &child_side) {
           return merge_t{
-              root_one,
-              root_two,
               start_column,
               end_column,
-              std::span<index_t const>{side_one.begin(), side_one.end()},
-              std::span<index_t const>{side_two.begin(), side_two.end()}
+              parent,
+              child,
+              std::span<index_t const>{parent_side.begin(), parent_side.end()},
+              std::span<index_t const>{child_side.begin(), child_side.end()}
           };
         },
-        std::views::all(d_roots_one), std::views::all(d_roots_two),
         std::views::all(d_start_columns), std::views::all(d_end_columns),
-        std::views::all(d_sides_one), std::views::all(d_sides_two)
+        std::views::all(d_parents), std::views::all(d_children),
+        std::views::all(d_parent_sides), std::views::all(d_child_sides)
     );
   }
 
   // Memory management
   [[nodiscard]] bool empty() const {
-    return d_roots_one.empty();
+    return d_parents.empty();
   }
   [[nodiscard]] std::size_t size() const {
-    return d_roots_one.size();
+    return d_parents.size();
   }
   void clear() {
     d_lens_grades.clear();
     d_distance_grades.clear();
-    d_roots_one.clear();
-    d_roots_two.clear();
-    d_sides_one.clear();
-    d_sides_two.clear();
+    d_parents.clear();
+    d_children.clear();
+    d_parent_sides.clear();
+    d_child_sides.clear();
   }
 
   // Python API takes ownership of the vectors to avoid copies.
-  [[nodiscard]] std::vector<grade_t> &&take_lens_grades() {
-    return std::move(d_lens_grades);
-  }
-  [[nodiscard]] std::vector<grade_t> &&take_distance_grades() {
-    return std::move(d_distance_grades);
-  }
-  [[nodiscard]] std::vector<index_t> &&take_roots_one() {
-    return std::move(d_roots_one);
-  }
-  [[nodiscard]] std::vector<index_t> &&take_roots_two() {
-    return std::move(d_roots_two);
-  }
   [[nodiscard]] std::vector<index_t> &&take_start_columns() {
     return std::move(d_start_columns);
   }
   [[nodiscard]] std::vector<index_t> &&take_end_columns() {
     return std::move(d_end_columns);
   }
-  [[nodiscard]] std::vector<std::vector<index_t>> &&take_sides_one() {
-    return std::move(d_sides_one);
+  [[nodiscard]] std::vector<grade_t> &&take_lens_grades() {
+    return std::move(d_lens_grades);
   }
-  [[nodiscard]] std::vector<std::vector<index_t>> &&take_sides_two() {
-    return std::move(d_sides_two);
+  [[nodiscard]] std::vector<grade_t> &&take_distance_grades() {
+    return std::move(d_distance_grades);
+  }
+  [[nodiscard]] std::vector<index_t> &&take_parents() {
+    return std::move(d_parents);
+  }
+  [[nodiscard]] std::vector<index_t> &&take_children() {
+    return std::move(d_children);
+  }
+  [[nodiscard]] std::vector<std::vector<index_t>> &&take_parent_sides() {
+    return std::move(d_parent_sides);
+  }
+  [[nodiscard]] std::vector<std::vector<index_t>> &&take_child_sides() {
+    return std::move(d_child_sides);
   }
 
  private:
@@ -139,32 +139,35 @@ class minimal_presentation_merges_t {
   ) {
     d_lens_grades.push_back(grade.lens);
     d_distance_grades.push_back(grade.distance);
-    d_roots_one.push_back(side_one.root());
-    d_roots_two.push_back(side_two.root());
+
+    auto [parent_side, child_side] = side_one.root() <= side_two.root()
+                                         ? std::tie(side_one, side_two)
+                                         : std::tie(side_two, side_one);
+
     d_start_columns.push_back(columns.first);
     d_end_columns.push_back(columns.second);
-    d_sides_one.emplace_back();
-    d_sides_two.emplace_back();
-    side_one.swap_children(d_sides_one.back());
-    side_two.swap_children(d_sides_two.back());
-    std::ranges::sort(d_sides_one.back());
-    std::ranges::sort(d_sides_two.back());
+    d_parents.push_back(parent_side.root());
+    d_children.push_back(child_side.root());
+    d_parent_sides.emplace_back(parent_side.take_children());
+    d_child_sides.emplace_back(child_side.take_children());
+    std::ranges::sort(d_parent_sides.back());
+    std::ranges::sort(d_child_sides.back());
   }
   void reserve(std::size_t const size) {
     d_lens_grades.reserve(size);
     d_distance_grades.reserve(size);
-    d_roots_one.reserve(size);
-    d_roots_two.reserve(size);
-    d_sides_one.reserve(size);
-    d_sides_two.reserve(size);
+    d_parents.reserve(size);
+    d_children.reserve(size);
+    d_parent_sides.reserve(size);
+    d_child_sides.reserve(size);
   }
   void shrink_to_fit() {
     d_lens_grades.shrink_to_fit();
     d_distance_grades.shrink_to_fit();
-    d_roots_one.shrink_to_fit();
-    d_roots_two.shrink_to_fit();
-    d_sides_one.shrink_to_fit();
-    d_sides_two.shrink_to_fit();
+    d_parents.shrink_to_fit();
+    d_children.shrink_to_fit();
+    d_parent_sides.shrink_to_fit();
+    d_child_sides.shrink_to_fit();
   }
 
   [[nodiscard]] static grade_t max_distance_grade(
@@ -188,8 +191,7 @@ class minimal_presentation_merges_t {
     if (edge_one.parent == edge_two.parent) {
       traverse_graph(
           graph, std::make_pair(idx_one, idx_two), grade_two, edge_one,
-          std::optional<index_t>{}, min_cluster_size,
-          std::min(grade_one.distance, upper_distance_limit)
+          std::optional<index_t>{}, min_cluster_size, upper_distance_limit
       );
     } else {
       traverse_graph(
@@ -215,15 +217,13 @@ class minimal_presentation_merges_t {
     // Initialize iteration states
     index_t const column_limit = graph.column_limit(grade);
     detail::minpres_iterator_t<edges_view_t, grades_view_t> side_one{
-        graph, roots.parent, connecting_point, column_limit,
-        upper_distance_limit
+        graph, roots.parent, connecting_point, column_limit, grade.distance
     };
     detail::minpres_iterator_t<edges_view_t, grades_view_t> side_two{
-        graph, roots.child, connecting_point, column_limit, upper_distance_limit
+        graph, roots.child, connecting_point, column_limit, grade.distance
     };
 
-    // Collect children up-to the lowest distance on either side until both
-    // sides converge. Store merges when both sides have sufficient size.
+    // Collect children on both sides until they converge
     while (true) {
       if ((side_one.empty() and side_two.empty()) or
           (side_one.empty() and side_one.num_children() < min_cluster_size) or
@@ -231,14 +231,15 @@ class minimal_presentation_merges_t {
         break;
 
       auto [active_side, other_side] = order_sides(side_one, side_two);
-      grade_t const distance_bound = active_side.next_distance();
-      if (active_side.collect_children(other_side, distance_bound))
+      if (grade_t const distance_bound = active_side.next_distance();
+          active_side.collect_children(other_side, distance_bound))
         break;
-
-      if (side_one.num_children() >= min_cluster_size and
-          side_two.num_children() >= min_cluster_size)
-        add_merge(columns, {grade.lens, distance_bound}, side_one, side_two);
     }
+
+    // Store merge if both sides have sufficient size
+    if (side_one.num_children() >= min_cluster_size and
+        side_two.num_children() >= min_cluster_size)
+      add_merge(columns, grade, side_one, side_two);
   }
   template <typename iteration_type_t>
   [[nodiscard]] static std::pair<iteration_type_t &, iteration_type_t &>

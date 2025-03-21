@@ -119,11 +119,9 @@ dists = pdist(X)
 
 def test_base_params():
     c = BPSCAN(min_samples=5, min_cluster_size=20).fit(X)
-    assert len(set(c.labels_)) == 7
-    assert len(set(c.labels_at_depth(0))) == 3
-    assert len(set(c.first_nonzero_membership())) == 7
+    assert len(set(c.labels_)) == 8
     assert c.membership_.shape == (X.shape[0], 6)
-    assert len(set(BPSCAN(min_samples=5, min_cluster_size=20).fit_predict(X))) == 7
+    assert len(set(BPSCAN(min_samples=5, min_cluster_size=20).fit_predict(X))) == 8
 
 
 def test_bad_args():
@@ -187,9 +185,7 @@ def test_precomputed_distances():
         metric="precomputed",
         lens="negative_eccentricity",
     ).fit(dists)
-    assert len(set(c.labels_)) == 5
-    assert len(set(c.labels_at_depth(0))) == 3
-    assert len(set(c.first_nonzero_membership())) == 6
+    assert len(set(c.labels_)) == 8
     assert c.membership_.shape == (X.shape[0], 6)
 
 
@@ -249,13 +245,11 @@ def test_attribute_conversions():
     if_pandas(mp.as_pandas)()
     if_networkx(mp.as_networkx)()
 
-    mh = c.merge_hierarchy_
+    mh = c.merges_
     if_pandas(mh.as_pandas)()
-    if_networkx(mh.as_networkx)()
 
-    sh = c.simplified_hierarchy_
+    sh = c.simplified_merges_
     if_pandas(sh.as_pandas)()
-    if_networkx(sh.as_networkx)()
 
     lh = c.linkage_hierarchy_
     if_pandas(lh.as_pandas)()
@@ -275,19 +269,17 @@ def test_minpres_plots():
 
 def test_merges_plots():
     c = BPSCAN(min_samples=5, min_cluster_size=20).fit(X)
-    mh = c.merge_hierarchy_
+    mh = c.merges_
     if_matplotlib(mh.plot_persistence_areas)(view_type="value")
     if_matplotlib(mh.plot_persistence_areas)(transposed=True)
-    if_pygraphviz(if_matplotlib(mh.plot_network))()
     if_matplotlib(mh.plot_merges)(*X.T)
 
 
-def test_hierarchy_plots():
+def test_simplified_plots():
     c = BPSCAN(min_samples=5, min_cluster_size=20).fit(X)
-    sh = c.simplified_hierarchy_
+    sh = c.simplified_merges_
     if_matplotlib(sh.plot_persistence_areas)(view_type="value")
     if_matplotlib(sh.plot_persistence_areas)(transposed=True)
-    if_pygraphviz(if_matplotlib(sh.plot_network))()
     if_matplotlib(sh.plot_merges)(*X.T)
 
 
