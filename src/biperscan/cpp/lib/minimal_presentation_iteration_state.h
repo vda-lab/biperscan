@@ -95,7 +95,7 @@ class minpres_iterator_t {
   void enqueue_children(index_t const node) {
     std::vector<index_t> const &child_columns = d_graph.children(node);
     auto upper_limit = std::ranges::distance(
-        std::ranges::upper_bound(child_columns, d_column_limit),
+        std::ranges::lower_bound(child_columns, d_column_limit),
         child_columns.end()
     );
 

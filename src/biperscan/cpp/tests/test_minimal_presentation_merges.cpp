@@ -43,12 +43,12 @@ TEST_CASE("api") {
 
   // Need to exist for the lifetime of the expected_merges object!
   constexpr std::array parent_side {0u, 2u};
-  constexpr std::array child_side {1u, 3u, 4u, 5u};
+  constexpr std::array child_side {1u, 3u, 4u};
   std::vector<std::pair<bigrade_t<unsigned long>, merge_t<unsigned>>>
       expected_merges{
           {{2ul, 10ul}, {0u, 3u, 0u, 1u, parent_side, std::span{child_side.begin(), child_side.end()-1}}},
           {{3ul,  7ul}, {3u, 5u, 0u, 1u, parent_side, std::span{child_side.begin(), child_side.end()}}},
-          {{4ul,  5ul}, {4u, 7u, 0u, 1u, parent_side, std::span{child_side.begin(), child_side.end()-2}}},
+          {{4ul,  5ul}, {4u, 7u, 0u, 1u, parent_side, std::span{child_side.begin(), child_side.end()-1}}},
       };
 
   SUBCASE("items") {
