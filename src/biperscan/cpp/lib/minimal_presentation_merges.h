@@ -206,7 +206,7 @@ class minimal_presentation_merges_t {
   template <view_of<edge_t> edges_view_t, view_of<bigrade_t> grades_view_t>
   void traverse_graph(
       detail::minpres_graph_t<edges_view_t, grades_view_t> const &graph,
-      std::pair<index_t, index_t> const &columns, bigrade_t const &grade,
+      std::pair<index_t, index_t> const &columns, bigrade_t grade,
       edge_t const &roots, std::optional<index_t> const connecting_point,
       std::size_t const min_cluster_size, grade_t const upper_distance_limit
   ) {
@@ -224,16 +224,15 @@ class minimal_presentation_merges_t {
     };
 
     // Collect children on both sides until they converge
-    while (true) {
-      if ((side_one.empty() and side_two.empty()) or
-          (side_one.empty() and side_one.num_children() < min_cluster_size) or
-          (side_two.empty() and side_two.num_children() < min_cluster_size))
-        break;
-
+    while ((not side_one.empty() or not side_two.empty()) and
+           (not side_one.empty() or side_one.num_children() >= min_cluster_size) and
+           (not side_two.empty() or side_two.num_children() >= min_cluster_size)) {
       auto [active_side, other_side] = order_sides(side_one, side_two);
       if (grade_t const distance_bound = active_side.next_distance();
-          active_side.collect_children(other_side, distance_bound))
+          active_side.collect_children(other_side, distance_bound)) {
+        grade.distance = distance_bound;
         break;
+      }
     }
 
     // Store merge if both sides have sufficient size

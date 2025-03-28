@@ -189,27 +189,22 @@ TEST_CASE("larger example (horse)") {
   CHECK(merges.merges().size() == 51);
 
   std::size_t cnt{0};
-  auto prev_end_column = 0u;
-  auto prev_start_column = 0u;
-  bigrade_t prev_grade{0u, 0u};
+  auto prev_column = std::pair(0u, 0u);
   for (auto const &[grade, merge] : merges.items()) {
+    auto const column = std::pair(merge.start_column, merge.end_column);
+    REQUIRE(column != prev_column);
+    prev_column = column;
     REQUIRE(merge.parent != merge.child);
     REQUIRE(merge.end_column > merge.start_column);
-    if (merge.start_column == prev_start_column and
-        merge.end_column == prev_end_column) {
-      if (cnt > 0)
-        REQUIRE(prev_grade.lens == grade.lens);
-      REQUIRE(prev_grade.distance < grade.distance);
-      REQUIRE(merge.parent_side.size() + merge.child_side.size() > 0);
-    } else {
-      REQUIRE(merge.parent_side.size() >= 25);
-      REQUIRE(merge.child_side.size() >= 25);
-    }
-    REQUIRE(count_union(merge.parent_side, merge.child_side) <= 1);
-    prev_end_column = merge.end_column;
-    prev_start_column = merge.start_column;
-    prev_grade = grade;
-    ++cnt;
+    REQUIRE(merge.parent_side.size() >= 25);
+    REQUIRE(merge.child_side.size() >= 25);
+    REQUIRE(count_union(merge.parent_side, merge.child_side) == 0);
+    auto it = std::ranges::lower_bound(merge.parent_side, merge.parent);
+    REQUIRE(it != merge.parent_side.end());
+    REQUIRE(*it == merge.parent);
+    it = std::ranges::lower_bound(merge.child_side, merge.child);
+    REQUIRE(it != merge.child_side.end());
+    REQUIRE(*it == merge.child);
   }
 }
 

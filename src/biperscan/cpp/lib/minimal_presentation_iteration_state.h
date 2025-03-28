@@ -62,14 +62,14 @@ class minpres_iterator_t {
   [[nodiscard]] bool collect_children(
       minpres_iterator_t const &other, grade_t const distance_bound
   ) {
-    while (true) {
+    while (!empty() and next_distance() <= distance_bound) {
       index_t const node = next();
       if (other.d_visited[node])
         return true;
       d_visited[node] = true;
       d_children.push_back(node);
-      if (empty() or next_distance() > distance_bound)
-        break;
+      d_root = std::min(node, d_root);
+      enqueue_children(node);
     }
     return false;
   }
@@ -88,8 +88,6 @@ class minpres_iterator_t {
     auto it = d_queue.begin();
     index_t const node = it->second;
     d_queue.erase(it);
-    enqueue_children(node);
-    d_root = std::min(node, d_root);
     return node;
   }
   void enqueue_children(index_t const node) {

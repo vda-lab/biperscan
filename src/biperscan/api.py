@@ -491,9 +491,7 @@ def _combine_merges(merges):
         return idx < len(sorted_arr) and sorted_arr[idx] == key
 
     groups = []
-
-    num_merges = len(merges["parent"])
-    for i in range(num_merges - 1, -1, -1):
+    for i in np.lexsort((merges["lens_grade"], merges["distance_grade"])):
         child = merges["child"][i]
         parent = merges["parent"][i]
         child_points = merges["child_side"][i]
