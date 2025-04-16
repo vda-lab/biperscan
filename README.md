@@ -1,5 +1,7 @@
 [![PyPI version](https://badge.fury.io/py/biperscan.svg)](https://badge.fury.io/py/biperscan)
 [![Tests](https://github.com/vda-lab/biperscan/actions/workflows/Wheels.yml/badge.svg?branch=main)](https://github.com/vda-lab/biperscan/actions/workflows/Wheels.yml)
+[![DOI](https://zenodo.org/badge/875964564.svg)](https://doi.org/10.5281/zenodo.15230388)
+
 
 # Bi-Persistence Clustering of Applications with Noise
 
@@ -86,7 +88,8 @@ GCC-14 and clang-19.
 
 ## Citing
 
-To credit this software please cite the Zenodo DOI: `...` (TODO).
+To credit this software please cite the Zenodo repository at
+[10.5281/zenodo.15230388](https://doi.org/10.5281/zenodo.15230388).
 
 ## Licensing
 
