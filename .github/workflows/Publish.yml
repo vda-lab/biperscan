@@ -7,7 +7,6 @@ on:
   push:
     tags:
       - v*
-  workflow_dispatch:
 
 jobs:
   publish_pypi:
@@ -42,17 +41,29 @@ jobs:
         run: |
           mkdir dist
           mv sdist/* dist/
-          mv wheels/* dist/
-          if [[ ! -f dist/pyflasc-${{ steps.version.outputs.version }}.tar.gz ]] ; then exit 1; fi
+          mv wheel*/* dist/
+          if [[ ! -f dist/biperscan-${{ steps.version.outputs.version }}.tar.gz ]] ; then exit 1; fi
       
+      - uses: actions/setup-python@v4
+        name: Install python
+        with: 
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade twine pkginfo
+
+      - name: Publish package to (Test)PyPI
+        uses: pypa/gh-action-pypi-publish@v1.12.4
+        # Comment lines below to publish to PyPi instead of test PyPi
+        # with:
+        #   repository-url: https://test.pypi.org/legacy/
+
       - name: Create Github Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
         run: |
-          gh release create -R vda-lab/pyflasc -t "Version ${{ steps.version.outputs.version }}" -n "**Full Changelog**: https://github.com/vda-lab/biperscan/commits/${{ steps.version.outputs.tag }}" "${{ steps.version.outputs.tag }}" dist/*.whl dist/*.tar.gz
+          gh release create -R vda-lab/biperscan -t "Version ${{ steps.version.outputs.version }}" -n "**Full Changelog**: https://github.com/vda-lab/biperscan/commits/${{ steps.version.outputs.tag }}" "${{ steps.version.outputs.tag }}" dist/*.whl dist/*.tar.gz
         
-      - name: Publish package to (Test)PyPI
-        uses: pypa/gh-action-pypi-publish@v1.8.5
-        # Comment lines below to publish to PyPi instead of test PyPi
-        # with:
-        #   repository-url: https://test.pypi.org/legacy/
+

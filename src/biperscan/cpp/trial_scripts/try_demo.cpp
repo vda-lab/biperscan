@@ -6,10 +6,11 @@
 
 int main() {
   using namespace bppc;
-  constexpr std::array dists{1.5,        1.80277564, 1.,         0.90138782,
-                             1.,         1.80277564, 0.90138782, 1.5,
-                             0.90138782, 0.90138782};
-  constexpr std::array lens{1., 1., 1., 1., 2.};
+  constexpr std::array dists{4.,         1.,         3.49284984, 3.04795013,
+                             2.05182845, 3.49284984, 1.,         2.62488095,
+                             3.0016662,  2.8,        2.0808652,  1.06301458,
+                             1.62788206, 2.11896201, 1.02956301};
+  constexpr std::array lens{0., 0., 0.50799656, 0.50799656, 0.95363885, 1.};
 
   biperscan_minpres_result_t<unsigned, std::size_t> res =
       biperscan_minpres<unsigned, std::size_t>(dists, lens);

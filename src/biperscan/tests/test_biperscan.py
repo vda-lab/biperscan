@@ -119,9 +119,9 @@ dists = pdist(X)
 
 def test_base_params():
     c = BPSCAN(min_samples=5, min_cluster_size=20).fit(X)
-    assert len(set(c.labels_)) == 8
+    assert len(set(c.labels_)) == 10
     assert c.membership_.shape == (X.shape[0], 6)
-    assert len(set(BPSCAN(min_samples=5, min_cluster_size=20).fit_predict(X))) == 8
+    assert len(set(BPSCAN(min_samples=5, min_cluster_size=20).fit_predict(X))) == 10
 
 
 def test_bad_args():

@@ -21,7 +21,7 @@ classifiers = [
 	"Natural Language :: English",
 	"Operating System :: OS Independent",
 	"Programming Language :: Python :: 3 :: Only",
-	"Programming Language :: C++ :: 23",
+	"Programming Language :: C++",
 	"Programming Language :: Cython"
 ]
 requires-python = ">=3.10"

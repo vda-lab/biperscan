@@ -382,7 +382,7 @@ class linkage_hierarchy_t {
         }
         break;
       }
-      // Found the same column; erase it and continue on one side.
+      // Found the same column; erase it and stop.
       if (child_it->first == parent_it->first) {
         check_ancestor(pivots, parent_it, parent_end, parent_root);
 

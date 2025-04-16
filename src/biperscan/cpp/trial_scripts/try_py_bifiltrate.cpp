@@ -33,7 +33,7 @@ int main() {
   std::cout << "\nMerges in " << m_result.merge_time << "s:\n";
   for (auto const &[lens, distance, parent, child] : std::views::zip(
            m_result.merge_lens_grades, m_result.merge_distance_grades,
-           m_result.merge_roots_one, m_result.merge_roots_two
+           m_result.merge_parents, m_result.merge_children
        ))
     std::cout << bigrade_t{lens, distance} << ' ' << edge_t{parent, child}
               << '\n';

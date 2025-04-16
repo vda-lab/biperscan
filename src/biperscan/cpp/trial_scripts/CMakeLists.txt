@@ -9,3 +9,6 @@ target_link_libraries(try_horse PRIVATE api)
 
 add_executable(try_flareable EXCLUDE_FROM_ALL try_flareable.cpp)
 target_link_libraries(try_flareable PRIVATE api)
+
+add_executable(try_demo EXCLUDE_FROM_ALL try_demo.cpp)
+target_link_libraries(try_demo PRIVATE api)
