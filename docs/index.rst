@@ -106,7 +106,7 @@ tools version 17), GCC-14 and clang-19.
 Citing
 ------
 
-To credit this software please cite the Zenodo DOI: ``...`` (TODO).
+To credit this software please cite the Zenodo DOI: ``https://doi.org/10.5281/zenodo.15230388``.
 
 Licensing
 ---------

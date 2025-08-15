@@ -11,10 +11,10 @@ authors = [
   {name= "Jelmer Bot", email = "jelmer.bot@uhasselt.be" }
 ]
 readme = "README.md"
-license = { text = "BSD-3-Clause" } 
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 classifiers = [
 	"Development Status :: 4 - Beta",
-	"License :: OSI Approved :: BSD License",
 	"Intended Audience :: Science/Research",
 	"Topic :: Scientific/Engineering",
 	"Topic :: Scientific/Engineering :: Visualization",

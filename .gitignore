@@ -5,6 +5,7 @@ build/
 _build/
 
 # Build Cython sources
+*.so
 *.pyd
 src/biperscan/*.cpp
 src/biperscan/**.cpp
