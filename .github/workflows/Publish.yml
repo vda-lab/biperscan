@@ -55,10 +55,7 @@ jobs:
           pip install --upgrade twine pkginfo
 
       - name: Publish package to (Test)PyPI
-        uses: pypa/gh-action-pypi-publish@v1.12.4
-        # Comment lines below to publish to PyPi instead of test PyPi
-        # with:
-        #   repository-url: https://test.pypi.org/legacy/
+        uses: pypa/gh-action-pypi-publish@release/v1
 
       - name: Create Github Release
         env:
