@@ -43,7 +43,7 @@ cdef class UnsignedWrapper:
     self.vec.swap(data)
     self.shape[0] = self.vec.size()
     self.strides[0] = sizeof(np.uint32_t)  
-    arr = np.asarray(self, copy=False)
+    arr = np.asarray(self)
     assert arr.shape[0] == self.vec.size()
     return arr
   

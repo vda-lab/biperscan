@@ -690,6 +690,7 @@ class MergeList:
         *,
         s: int = 2,
         title_y: float = 0.9,
+        title_size: int = 8,
         arrowsize: int = 10,
         linewidth: float = 1,
     ):
@@ -732,7 +733,7 @@ class MergeList:
             labels[parent_side] = 1
             labels[child_side] = 2
             plt.subplot(n_rows, n_cols, n + 1)
-            plt.title(f"{n}", fontsize=6, y=title_y)
+            plt.title(f"{n}", fontsize=title_size, y=title_y)
             plt.scatter(
                 xs,
                 ys,
@@ -863,7 +864,7 @@ class SimplifiedMergeList:
                 trace[x_attr], trace[y_attr], color=f"C{i%10}", label=f"{i}", **line_kws
             )
             plt.scatter(trace[x_attr], trace[y_attr], color=f"C{i%10}", **node_kws)
-        plt.legend(title="simplified merge", loc="lower left")
+        plt.legend(title="Simplified merge", loc="lower left")
 
         self._persistent_axes(
             x_attr,
@@ -880,6 +881,7 @@ class SimplifiedMergeList:
         *,
         s: int = 2,
         title_y: float = 0.9,
+        title_size: int = 8,
         arrowsize: int = 10,
         linewidth: float = 1,
         n_rows: int | None = None,
@@ -929,7 +931,7 @@ class SimplifiedMergeList:
             labels[parent_side] = 1
             labels[child_side] = 2
             plt.subplot(n_rows, n_cols, n + 1)
-            plt.title(f"{n}", fontsize=6, y=title_y)
+            plt.title(f"{n}", fontsize=title_size, y=title_y)
             plt.scatter(
                 xs,
                 ys,
